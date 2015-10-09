@@ -1,0 +1,6 @@
+*.name
+.idea/
+target/classes/us/myles/sqlBackend/sql/dao/RecordBackend.class
+*.db
+*.iml
+target/

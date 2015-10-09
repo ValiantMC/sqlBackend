@@ -1,0 +1,16 @@
+Backend Layer
+Responsible for talking directly with SQL and marking last updated.
+
+Caching Layer
+Responsible for keeping data in memory for 30s, then rerequesting the info after.
+Also responsible for holding the last update time? (Possibly used every second? to ensure data is up to date)
+
+
+API Layer
+Responsible for setting and getting the data as well as making it flawlessly communicate between layers
+
+
+
+TODO List:
+[] Possibly use Keys for things?
+[] Init tables
