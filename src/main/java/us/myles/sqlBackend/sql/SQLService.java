@@ -1,5 +1,8 @@
 package us.myles.sqlBackend.sql;
 
+import org.apache.commons.dbcp2.*;
+import org.apache.commons.pool2.ObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.skife.jdbi.v2.Binding;
 import org.skife.jdbi.v2.DBI;
 import org.skife.jdbi.v2.StatementContext;
@@ -65,7 +68,10 @@ public class SQLService implements RecordService {
             ds.setUrl(connectionAddr);
             this.dbi = new DBI(ds);
         } else {
-            this.dbi = new DBI(connectionAddr);
+            BasicDataSource bds = new BasicDataSource();
+            bds.setUrl(connectionAddr);
+            bds.setInitialSize(5);
+            this.dbi = new DBI(bds);
         }
 
         // rewrite the statements >.>
