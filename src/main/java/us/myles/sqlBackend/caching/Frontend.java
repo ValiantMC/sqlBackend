@@ -10,6 +10,10 @@ public class Frontend {
         this.internalData = internalData;
     }
 
+    public Frontend(){
+        this.internalData = new DummyRecordData();
+    }
+
     public void init() {
 
     }
@@ -20,7 +24,12 @@ public class Frontend {
 
     // if this is false, record is deleted >.>
     public boolean ensureLatest(){
-        return internal().verify(this, true);
+        if(internal().verify(this, true)){
+            internal().pushUpdates();
+            return true;
+        }else{
+            return false;
+        }
     }
 
     protected RecordData internal() {

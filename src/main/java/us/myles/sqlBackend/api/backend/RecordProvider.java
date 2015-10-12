@@ -5,6 +5,7 @@ import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.Update;
 
 import java.util.List;
+import java.util.Map;
 
 public interface RecordProvider<T> {
     Optional<T> findRecord(int id);
@@ -32,4 +33,6 @@ public interface RecordProvider<T> {
     void shutdown();
 
     void forceQueuedUpdates(T id);
+
+    void bulkUpdate(int record, Map<String, Object> map);
 }

@@ -22,33 +22,59 @@ public class SQLService implements RecordService {
     private DBI dbi;
     private Map<String, SQLTable> tables = new ConcurrentHashMap<>();
     private Queue<SQLValueChange> pushQueue = new ConcurrentLinkedQueue<>();
-    ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor();
+    Thread ses;
     private RecordBackend recordBackend;
 
     public SQLService(String connectionAddr) {
         this.connectionAddr = connectionAddr;
-        ses.scheduleWithFixedDelay(new Runnable() {
+        ses = new Thread() {
+            public void run() {
+                while (true) {
+                    final Runnable r = pushQueue.poll();
+                    if (r == null) {
+                        try {
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {}
+                    } else {
+                        r.run();
+                    }
+                }
+            }
+        };
+        ses.setDaemon(true);
+        ses.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                final Runnable r = pushQueue.poll();
-                if (r == null) return;
-                r.run();
+                shutdown();
             }
-        }, 0, 10, TimeUnit.MILLISECONDS);
+        });
         connect();
     }
 
     private void connect() {
-        SQLiteDataSource ds = new SQLiteDataSource();
-        ds.setUrl(connectionAddr);
-        this.dbi = new DBI(ds);
+        //init sql
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            System.out.println("Warning, no SQL found...");
+        }
+        if (connectionAddr.startsWith("jdbc:sqlite")) {
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl(connectionAddr);
+            this.dbi = new DBI(ds);
+        } else {
+            this.dbi = new DBI(connectionAddr);
+        }
+
         // rewrite the statements >.>
         final StatementRewriter oldRewriter = dbi.getStatementRewriter();
         // bind <table> to table variable (because it's stupid...)
         dbi.setStatementRewriter(new StatementRewriter() {
             public RewrittenStatement rewrite(String s, Binding binding, StatementContext statementContext) {
                 if (s.contains("<table>"))
-                    s = s.replace("<table>", binding.forName("table").toString());
+                    s = s.replace("<table>", binding.forName("table").toString().replace("'", ""));
                 if (s.contains("<key>"))
                     s = s.replace("<key>", binding.forName("key").toString().replace("'", ""));
                 RewrittenStatement rs = oldRewriter.rewrite(s, binding, statementContext);
@@ -82,8 +108,8 @@ public class SQLService implements RecordService {
     public void queue(String table, int id, String key, Object value, Long lastUpdated) {
         // look throug queue first
         for (SQLValueChange svc : pushQueue) {
-            if (svc.getTable().equals(table) && svc.getRecord() == id && svc.getKey().equals(key)) {
-                svc.setValue(value);
+            if (svc.getTable().equals(table) && svc.getRecord() == id) {
+                svc.getMap().put(key, value);
                 return;
             }
         }
@@ -94,34 +120,23 @@ public class SQLService implements RecordService {
         int recordID = rd.getAsInt("id");
         for (SQLValueChange v : pushQueue) {
             if (v.getTable().equals(table) && v.getRecord() == recordID) {
-                rd.put(v.getKey(), v.getValue());
+                for (Map.Entry<String, Object> entry : v.getMap().entrySet()) {
+                    rd.put(entry.getKey(), entry.getValue());
+                }
             }
         }
     }
 
     public void shutdown() {
-        System.out.println("Attempting to finish SQL Query Queue.");
-        Long time = 0L;
-        while (pushQueue.size() != 0) {
-            if (time >= 10000) {
-                System.out.println("Could not finish entire queue in time, attempting to finish current queries.");
-                break;
+        if (recordBackend != null) {
+            ses.interrupt();
+            System.out.println("Attempting to finish SQL Query Queue. (" + pushQueue.size() + ")");
+            for (SQLValueChange v : pushQueue) {
+                v.run();
             }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            time += 100;
+            System.out.println("Shutting down SQL...");
+            recordBackend.close();
+            System.out.println("All done, woohoo!");
         }
-        System.out.println("Shutting down SQL...");
-        ses.shutdownNow();
-        try {
-            ses.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        recordBackend.close();
-        System.out.println("All done, woohoo!");
     }
 }

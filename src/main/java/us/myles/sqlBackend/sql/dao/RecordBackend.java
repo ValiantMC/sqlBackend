@@ -12,7 +12,7 @@ import java.util.List;
 
 @RegisterMapper(value = MapDataMapper.class)
 public interface RecordBackend extends GetHandle {
-    @SqlUpdate("insert into <table> DEFAULT VALUES")
+    @SqlUpdate("insert into <table> VALUES()")
     @GetGeneratedKeys
     int createRecord(@Bind("table") String table);
 

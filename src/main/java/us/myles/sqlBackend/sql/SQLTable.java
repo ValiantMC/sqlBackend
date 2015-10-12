@@ -1,13 +1,18 @@
 package us.myles.sqlBackend.sql;
 
 import com.google.common.base.Optional;
+import org.skife.jdbi.v2.PreparedBatch;
+import org.skife.jdbi.v2.PreparedBatchPart;
 import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.Update;
 import us.myles.sqlBackend.api.backend.RecordData;
 import us.myles.sqlBackend.api.backend.RecordProvider;
+import us.myles.sqlBackend.caching.DummyRecordData;
 import us.myles.sqlBackend.sql.dao.RecordBackend;
 
+import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 
 public class SQLTable implements RecordProvider<RecordData> {
     private final String table;
@@ -36,7 +41,8 @@ public class SQLTable implements RecordProvider<RecordData> {
     @Override
     public RecordData createRecord() {
         int id = backend.createRecord(table);
-        MapData md = backend.findRecord(table, id);
+        MapData md = new MapData();
+        md.directPut("id", id);
         md.attach(this);
         return md;
     }
@@ -121,6 +127,28 @@ public class SQLTable implements RecordProvider<RecordData> {
     @Override
     public void forceQueuedUpdates(RecordData rd) {
         service.forceQueuedUpdates(table, rd.getAsInt("id"));
+    }
+
+    @Override
+    public void bulkUpdate(int record, Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("update <table> set ");
+        for (String key : map.keySet()) {
+            if (!sb.toString().equals("update <table> set ")) {
+                sb.append(", ");
+            }
+            sb.append("" + key + " = ? ");
+
+        }
+        sb.append("where id = ?;");
+        Update s = createUpdate(sb.toString());
+        int i = 0;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            s.bind(i++, entry.getValue());
+        }
+        s.bind(i, record);
+
+        s.execute();
     }
 
     public void queueUpdateRecord(int id, String key, Object value, Long lastUpdated) {

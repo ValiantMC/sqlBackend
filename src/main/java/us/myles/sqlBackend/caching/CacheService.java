@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -177,5 +178,10 @@ public class CacheService<T extends Frontend> implements RecordProvider<T> {
     @Override
     public void forceQueuedUpdates(T t) {
         provider.forceQueuedUpdates(t.internal());
+    }
+
+    @Override
+    public void bulkUpdate(int record, Map<String, Object> map) {
+        provider.bulkUpdate(record, map);
     }
 }

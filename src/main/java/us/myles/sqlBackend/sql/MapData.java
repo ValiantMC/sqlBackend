@@ -4,6 +4,8 @@ import com.google.common.base.Optional;
 import us.myles.sqlBackend.api.backend.RecordData;
 import us.myles.sqlBackend.caching.Frontend;
 
+import java.sql.Timestamp;
+
 public class MapData extends RecordData {
     // just incase of serial stuf
     private transient SQLTable table;
@@ -11,7 +13,7 @@ public class MapData extends RecordData {
     @Override
     public void handlePut(String key, Object value) {
         Long time = System.currentTimeMillis();
-        directPut("lastUpdated", time);
+        directPut("lastUpdated", new Timestamp(time));
         getBackendTable().queueUpdateRecord(getAsInt("id"), key, value, time);
     }
 
@@ -34,7 +36,7 @@ public class MapData extends RecordData {
         if (rd.isPresent()) {
             // should be present >.> otherwise it was deleted #awkward
             if (rd.get().is("lastUpdated") && is("lastUpdated") || force) {
-                if (rd.get().getAsLong("lastUpdated") > getAsLong("lastUpdated") || force) {
+                if (((Timestamp)rd.get().get("lastUpdated")).getTime() > ((Timestamp)get("lastUpdated")).getTime() || force) {
                     // replace internal
                     frontend.inject(rd.get());
                 }

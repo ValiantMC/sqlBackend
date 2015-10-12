@@ -10,24 +10,24 @@ import us.myles.sqlBackend.sql.SQLService;
 public class Example {
     public static void main(String[] args) {
         // Example of using the service for a users table
-        RecordService rs = new SQLService("jdbc:sqlite:data.db");
+        RecordService rs = new SQLService("jdbc:mysql://localhost/testdb?user=root&password=");
         RecordProvider rp = rs.getTable("users");
         CacheService<User> cacheTest = new CacheService<>(User.class, rp);
 
-        System.out.println("Age 19: " + cacheTest.findRecord("age", 18).get().getUsername());
+//        System.out.println("Age 19: " + cacheTest.findRecord("age", 18).get().getUsername());
 
         System.out.println("Testing custom queries");
-        Query q = cacheTest.createQuery("SELECT * FROM <table> ORDER BY age LIMIT 2");
+        Query q = cacheTest.createQuery("SELECT * FROM <table> ORDER BY id LIMIT 2");
         for(User x:cacheTest.findRecords(q)){
             System.out.println("Found record: " + x.getUsername());
         }
-        Update q2 = cacheTest.createUpdate("UPDATE <table> SET age = '10' WHERE age = '6999'");
-        System.out.println(q2.execute());
-        System.out.println("Adding a new user");
-        User u = cacheTest.createRecord();
-        u.setUsername("Jeff");
-        //u.setAge(69);
-        System.out.println("Done making user");
+//        Update q2 = cacheTest.createUpdate("UPDATE <table> SET age = '10' WHERE age = '6999'");
+//        System.out.println(q2.execute());
+//        System.out.println("Adding a new user");
+//        User u = cacheTest.createRecord();
+//        u.setUsername("Jeff");
+//        //u.setAge(69);
+//        System.out.println("Done making user");
         // finally
         cacheTest.shutdown();
     }
