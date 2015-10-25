@@ -5,6 +5,7 @@ import org.skife.jdbi.v2.PreparedBatch;
 import org.skife.jdbi.v2.PreparedBatchPart;
 import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.Update;
+import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 import us.myles.sqlBackend.api.backend.RecordData;
 import us.myles.sqlBackend.api.backend.RecordProvider;
 import us.myles.sqlBackend.caching.DummyRecordData;
@@ -29,7 +30,13 @@ public class SQLTable implements RecordProvider<RecordData> {
     @Override
     public Optional<RecordData> findRecord(int id) {
         synchronized (lock) {
-            MapData rd = backend.findRecord(table, id);
+
+            MapData rd;
+            try {
+                rd = backend.findRecord(table, id);
+            } catch (UnableToExecuteStatementException e) {
+                rd = backend.findRecord(table, id);
+            }
             if (rd != null) {
                 rd.attach(this);
                 service.syncRecord(table, rd);
@@ -40,7 +47,12 @@ public class SQLTable implements RecordProvider<RecordData> {
 
     @Override
     public RecordData createRecord() {
-        int id = backend.createRecord(table);
+        int id;
+        try {
+            id = backend.createRecord(table);
+        } catch (UnableToExecuteStatementException e) {
+            id = backend.createRecord(table);
+        }
         MapData md = new MapData();
         md.directPut("id", id);
         md.attach(this);
@@ -50,28 +62,45 @@ public class SQLTable implements RecordProvider<RecordData> {
     @Override
     public void deleteRecord(int id) {
         synchronized (lock) {
-            backend.deleteRecord(table, id);
+            try {
+                backend.deleteRecord(table, id);
+            } catch (UnableToExecuteStatementException e) {
+                backend.deleteRecord(table, id);
+            }
         }
     }
 
     @Override
     public void updateRecord(int id, String key, Object value) {
         synchronized (lock) {
-            backend.updateRecord(table, id, key, value);
+            try {
+                backend.updateRecord(table, id, key, value);
+            } catch (UnableToExecuteStatementException e) {
+                backend.updateRecord(table, id, key, value);
+            }
         }
     }
 
     @Override
     public boolean isRecord(int id) {
         synchronized (lock) {
-            return backend.isRecord(table, id);
+            try {
+                return backend.isRecord(table, id);
+            } catch (UnableToExecuteStatementException e) {
+                return backend.isRecord(table, id);
+            }
         }
     }
 
     @Override
     public List<RecordData> findRecords(String key, Object value) {
         synchronized (lock) {
-            List<MapData> data = backend.findRecords(table, key, value);
+            List<MapData> data;
+            try {
+                data = backend.findRecords(table, key, value);
+            } catch (UnableToExecuteStatementException e) {
+                data = backend.findRecords(table, key, value);
+            }
             for (MapData md : data) {
                 md.attach(this);
                 service.syncRecord(table, md);
@@ -82,23 +111,49 @@ public class SQLTable implements RecordProvider<RecordData> {
 
     @Override
     public Query<RecordData> createQuery(String initialQuery) {
-        return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+        try {
+            return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+        } catch (UnableToExecuteStatementException e) {
+            return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+        }
     }
 
     @Override
     public Update createUpdate(String initialQuery) {
-        return backend.getHandle().createStatement(initialQuery).bind("table", table);
+        try {
+            return backend.getHandle().createStatement(initialQuery).bind("table", table);
+        } catch (UnableToExecuteStatementException e) {
+            return backend.getHandle().createStatement(initialQuery).bind("table", table);
+        }
     }
 
     @Override
     public List<RecordData> findRecords(Query query) {
-        return (List<RecordData>) (List<?>) query.list();
+        List<RecordData> rd;
+        try {
+            rd = (List<RecordData>) (List<?>) query.list();
+        } catch (UnableToExecuteStatementException e) {
+            rd = (List<RecordData>) (List<?>) query.list();
+        }
+        for (RecordData r : rd) {
+            if (r instanceof MapData) {
+                ((MapData) r).attach(this);
+                service.syncRecord(table, r);
+            }
+        }
+        return rd;
     }
 
     @Override
     public Optional<RecordData> findRecord(String key, Object value) {
         synchronized (lock) {
-            MapData rd = backend.findRecord(table, key, value);
+            MapData rd;
+            try {
+                rd = backend.findRecord(table, key, value);
+            } catch (UnableToExecuteStatementException e) {
+                rd = backend.findRecord(table, key, value);
+            }
+
             if (rd != null) {
                 rd.attach(this);
                 service.syncRecord(table, rd);
@@ -110,7 +165,12 @@ public class SQLTable implements RecordProvider<RecordData> {
     @Override
     public List<RecordData> findAll() {
         synchronized (lock) {
-            List<MapData> data = backend.findAll(table);
+            List<MapData> data;
+            try {
+                data = backend.findAll(table);
+            } catch (UnableToExecuteStatementException e) {
+                data = backend.findAll(table);
+            }
             for (MapData md : data) {
                 md.attach(this);
                 service.syncRecord(table, md);

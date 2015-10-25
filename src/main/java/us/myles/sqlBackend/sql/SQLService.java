@@ -3,11 +3,10 @@ package us.myles.sqlBackend.sql;
 import org.apache.commons.dbcp2.*;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.skife.jdbi.v2.Binding;
-import org.skife.jdbi.v2.DBI;
-import org.skife.jdbi.v2.StatementContext;
+import org.skife.jdbi.v2.*;
 import org.skife.jdbi.v2.tweak.RewrittenStatement;
 import org.skife.jdbi.v2.tweak.StatementRewriter;
+import org.skife.jdbi.v2.tweak.TransactionHandler;
 import org.sqlite.SQLiteDataSource;
 import us.myles.sqlBackend.api.backend.RecordData;
 import us.myles.sqlBackend.api.backend.RecordProvider;
@@ -71,6 +70,7 @@ public class SQLService implements RecordService {
             BasicDataSource bds = new BasicDataSource();
             bds.setUrl(connectionAddr);
             bds.setInitialSize(5);
+            bds.setConnectionProperties("validationQuery=SELECT 1;");
             this.dbi = new DBI(bds);
         }
 
