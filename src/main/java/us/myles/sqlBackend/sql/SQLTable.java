@@ -1,17 +1,13 @@
 package us.myles.sqlBackend.sql;
 
 import com.google.common.base.Optional;
-import org.skife.jdbi.v2.PreparedBatch;
-import org.skife.jdbi.v2.PreparedBatchPart;
 import org.skife.jdbi.v2.Query;
 import org.skife.jdbi.v2.Update;
 import org.skife.jdbi.v2.exceptions.UnableToExecuteStatementException;
 import us.myles.sqlBackend.api.backend.RecordData;
 import us.myles.sqlBackend.api.backend.RecordProvider;
-import us.myles.sqlBackend.caching.DummyRecordData;
 import us.myles.sqlBackend.sql.dao.RecordBackend;
 
-import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
@@ -47,16 +43,18 @@ public class SQLTable implements RecordProvider<RecordData> {
 
     @Override
     public RecordData createRecord() {
-        int id;
-        try {
-            id = backend.createRecord(table);
-        } catch (UnableToExecuteStatementException e) {
-            id = backend.createRecord(table);
+        synchronized (lock) {
+            int id;
+            try {
+                id = backend.createRecord(table);
+            } catch (UnableToExecuteStatementException e) {
+                id = backend.createRecord(table);
+            }
+            MapData md = new MapData();
+            md.directPut("id", id);
+            md.attach(this);
+            return md;
         }
-        MapData md = new MapData();
-        md.directPut("id", id);
-        md.attach(this);
-        return md;
     }
 
     @Override
@@ -111,37 +109,43 @@ public class SQLTable implements RecordProvider<RecordData> {
 
     @Override
     public Query<RecordData> createQuery(String initialQuery) {
-        try {
-            return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
-        } catch (UnableToExecuteStatementException e) {
-            return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+        synchronized (lock) {
+            try {
+                return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+            } catch (UnableToExecuteStatementException e) {
+                return (Query<RecordData>) (Query<?>) backend.getHandle().createQuery(initialQuery).mapTo(MapData.class).bind("table", table);
+            }
         }
     }
 
     @Override
     public Update createUpdate(String initialQuery) {
-        try {
-            return backend.getHandle().createStatement(initialQuery).bind("table", table);
-        } catch (UnableToExecuteStatementException e) {
-            return backend.getHandle().createStatement(initialQuery).bind("table", table);
+        synchronized (lock) {
+            try {
+                return backend.getHandle().createStatement(initialQuery).bind("table", table);
+            } catch (UnableToExecuteStatementException e) {
+                return backend.getHandle().createStatement(initialQuery).bind("table", table);
+            }
         }
     }
 
     @Override
     public List<RecordData> findRecords(Query query) {
-        List<RecordData> rd;
-        try {
-            rd = (List<RecordData>) (List<?>) query.list();
-        } catch (UnableToExecuteStatementException e) {
-            rd = (List<RecordData>) (List<?>) query.list();
-        }
-        for (RecordData r : rd) {
-            if (r instanceof MapData) {
-                ((MapData) r).attach(this);
-                service.syncRecord(table, r);
+        synchronized (lock) {
+            List<RecordData> rd;
+            try {
+                rd = (List<RecordData>) (List<?>) query.list();
+            } catch (UnableToExecuteStatementException e) {
+                rd = (List<RecordData>) (List<?>) query.list();
             }
+            for (RecordData r : rd) {
+                if (r instanceof MapData) {
+                    ((MapData) r).attach(this);
+                    service.syncRecord(table, r);
+                }
+            }
+            return rd;
         }
-        return rd;
     }
 
     @Override
@@ -191,24 +195,26 @@ public class SQLTable implements RecordProvider<RecordData> {
 
     @Override
     public void bulkUpdate(int record, Map<String, Object> map) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("update <table> set ");
-        for (String key : map.keySet()) {
-            if (!sb.toString().equals("update <table> set ")) {
-                sb.append(", ");
+        synchronized (lock) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("update <table> set ");
+            for (String key : map.keySet()) {
+                if (!sb.toString().equals("update <table> set ")) {
+                    sb.append(", ");
+                }
+                sb.append("" + key + " = ? ");
+
             }
-            sb.append("" + key + " = ? ");
+            sb.append("where id = ?;");
+            Update s = createUpdate(sb.toString());
+            int i = 0;
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                s.bind(i++, entry.getValue());
+            }
+            s.bind(i, record);
 
+            s.execute();
         }
-        sb.append("where id = ?;");
-        Update s = createUpdate(sb.toString());
-        int i = 0;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            s.bind(i++, entry.getValue());
-        }
-        s.bind(i, record);
-
-        s.execute();
     }
 
     public void queueUpdateRecord(int id, String key, Object value, Long lastUpdated) {
